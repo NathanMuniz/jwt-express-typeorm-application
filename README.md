@@ -1,10 +1,8 @@
-# Readme
-
 # Aprendendo a fazer uma completa aplicação usando REST API, com autenticação JWT e autorização, usando o poder de TypeScript.
 
 ## Vamos começar !
 
-Vamos começar usando a ferramenta de CLI do TypeORM, que nos permite criar uma aplicação base para começarmos. Então precisamos instalar TypeORM  e então configurar nossa aplicação.
+Vamos começar usando a ferramenta CLI do TypeORM, que nos permite criar uma nova aplicação base para começarmos. Então precisamos instalar TypeORM e configurar nossa aplicação.
 
 ```powershell
 # Instalação 
@@ -29,7 +27,7 @@ npm install -s @types/bcryptjs @types/body-parser @types/cors @types/helmet @typ
 
 ### Index.ts
 
-Iremos criar um nova conexão conexão com o banco de dados, então iremos inicializar nossa aplicação express. É importante também chamar os middlewares que usares (cors, bodyparser e helmet), setar a pasta onde estará nossas rotas e ouvir a porta em que nossa aplicação estará: 3000
+Iremos criar um nova conexão com o banco de dados e iremos inicializar nossa aplicação express. É importante também chamar os middlewares que usaremos (cors, bodyparser e helmet), setar a pasta onde estará nossas rotas e ouvir a porta em que nossa aplicação estará: 3000
 
 ```tsx
 import "reflect-metadata";
@@ -63,7 +61,7 @@ createConnection()
 
 ## Middlewares
 
-Além dos middlewares que importamos, iremos precisar criar outros que nós ajudará a trabalhar com o JWT. Iremos criar nosso middlewares dentro das pasta de middlewares.
+Além dos middlewares que importamos, iremos precisar criar outros que nós ajudará a trabalhar com o jwt. Iremos criar nossos middlewares dentro das pasta de middlewares.
 
 **********CheckJwt.ts**********
 
@@ -79,7 +77,7 @@ Além dos middlewares que importamos, iremos precisar criar outros que nós ajud
     };
     ```
     
-    Assinamos então nosso Payload com o retorno da função jwt.verify, passando nosso token e nossa chave secreta como parâmetros. Esse payload contém os dados do usuário, iremos usar o locals de nosso response para enviar esse payload. Caso ocorra algum erro, iremos enviar o código 401 (não autorizado) e pararemos nosso token por aí.
+    Temos que assinar o Payload com o retorno da função jwt.verify, passando nosso token e nossa chave secreta como parâmetros. Esse payload contém os dados do usuário, iremos usar o locals de nosso response para enviar esse payload. Caso ocorra algum erro, iremos enviar o código 401 (não autorizado) e pararemos nosso token por aí.
     
     ```tsx
     export const checkJwt = (req: Request, res: Response, next: NextFunction) => {
@@ -100,3 +98,38 @@ Além dos middlewares que importamos, iremos precisar criar outros que nós ajud
     ```
     
     Após validar o token, iremos criar um novo token que inspira em 1h. Para isso iremos pegar o userId e o username do paylod, charemos o método jwt.sing e passaremos os dados, o segredo e quanto tampo nosso token irá durar. Após isso, iremos setar esse novo token no nosso response.
+    
+    ```tsx
+    import { Request, Response, NextFunction } from "express";
+    import * as jwt from "jsonwebtoken";
+    import config from "../config/config";
+    
+    export const checkJwt = (req: Request, res: Response, next: NextFunction) => {
+      // Pegando jwt do header
+      const token = <string>req.headers["auth"];
+      let jwtPayload;
+    
+      //Try to validate the token and get data
+      try {
+        jwtPayload = <any>jwt.verify(token, config.jwtSecret);
+        res.locals.jwtPayload = jwtPayload;
+      } catch (error) {
+        ///Se o token não for válido, responder com 401 (unauthorized)
+        res.status(401).send();
+        return;
+      }
+    
+      //O token é válido por 1h
+      //Iremos enviar um novo token a cada request
+      const { userId, username } = jwtPayload;
+      const newToken = jwt.sign({ userId, username }, config.jwtSecret, {
+        expiresIn: "1h"
+      });
+      res.setHeader("token", newToken);
+    
+      //Chama o próximo middleware
+      next();
+    };
+    ```
+    
+    more code

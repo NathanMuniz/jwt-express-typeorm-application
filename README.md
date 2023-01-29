@@ -1,6 +1,8 @@
+#Readme
+
 # Aprendendo a fazer uma completa aplicação usando REST API, com autenticação JWT e autorização, usando o poder de TypeScript.
 
-## Vamos começar !
+### Vamos começar !
 
 Vamos começar usando a ferramenta CLI do TypeORM, que nos permite criar uma nova aplicação base para começarmos. Então precisamos instalar TypeORM e configurar nossa aplicação.
 

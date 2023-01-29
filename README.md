@@ -59,6 +59,68 @@ createConnection()
   .catch(error => console.log(error));
 ```
 
+## Entidade User
+
+O TypeOrm, por padrão já cria uma entidade para o User, porém iremos modificar um pouco o que foi criado. Como estamos trabalhando com ORM, criar um table user se torna muito trivial e fácil, decorator facilita muito nossa vida.
+
+- Principais campos
+    - id
+    - username
+    - password
+    - role
+    - updateAt
+- métodos
+    - hashPassword - cripta nossa senha
+    - checkIfunencrypetdPasswordIsvALID - verifica se nossa senha não criptada é válida
+
+```tsx
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  Unique,
+  CreateDateColumn,
+  UpdateDateColumn
+} from "typeorm";
+import { Length, IsNotEmpty } from "class-validator";
+import * as bcrypt from "bcryptjs";
+
+@Entity()
+@Unique(["username"])
+export class User {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column()
+  @Length(4, 20)
+  username: string;
+
+  @Column()
+  @Length(4, 100)
+  password: string;
+
+  @Column()
+  @IsNotEmpty()
+  role: string;
+
+  @Column()
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @Column()
+  @UpdateDateColumn()
+  updatedAt: Date;
+
+  hashPassword() {
+    this.password = bcrypt.hashSync(this.password, 8);
+  }
+
+  checkIfUnencryptedPasswordIsValid(unencryptedPassword: string) {
+    return bcrypt.compareSync(unencryptedPassword, this.password);
+  }
+}
+```
+
 ## Middlewares
 
 Além dos middlewares que importamos, iremos precisar criar outros que nós ajudará a trabalhar com o jwt. Iremos criar nossos middlewares dentro das pasta de middlewares.
@@ -76,6 +138,8 @@ Além dos middlewares que importamos, iremos precisar criar outros que nós ajud
       let jwtPayload;
     };
     ```
+    
+    ---
     
     Temos que assinar o Payload com o retorno da função jwt.verify, passando nosso token e nossa chave secreta como parâmetros. Esse payload contém os dados do usuário, iremos usar o locals de nosso response para enviar esse payload. Caso ocorra algum erro, iremos enviar o código 401 (não autorizado) e pararemos nosso token por aí.
     
@@ -96,6 +160,8 @@ Além dos middlewares que importamos, iremos precisar criar outros que nós ajud
       }
     };
     ```
+    
+    ---
     
     Após validar o token, iremos criar um novo token que inspira em 1h. Para isso iremos pegar o userId e o username do paylod, charemos o método jwt.sing e passaremos os dados, o segredo e quanto tampo nosso token irá durar. Após isso, iremos setar esse novo token no nosso response.
     
@@ -133,4 +199,44 @@ Além dos middlewares que importamos, iremos precisar criar outros que nós ajud
     ```
     
 
-more code
+******************checkRole******************
+
+- Esse middleware será responsável por verificar se o usuário tem acesso a certas “roles”, certas permissões.
+    
+    Essa função irá receber uma lista de permissões e retorna umaf unção assincrona que validará se nossa request tem essas permissões.
+    
+    Iremos busca a ID do usuário que fez o resquest, e buscaremos esse usuário usando o repository, tratando caso não encontre o usuário.
+    
+    Após buscar o usuário, checaremos se o array de roles autorizados inclui os roles do usuário.
+    
+    Nosso código ficará assim:
+    
+    ```tsx
+    import { Request, Response, NextFunction } from "express";
+    import { getRepository } from "typeorm";
+    
+    import { User } from "../entity/User";
+    
+    export const checkRole = (roles: Array<string>) => {
+      return async (req: Request, res: Response, next: NextFunction) => {
+        //Pega a Id do usuário
+        const id = res.locals.jwtPayload.userId;
+    
+        //Busca o usuário
+        const userRepository = getRepository(User);
+        let user: User;
+        try {
+          user = await userRepository.findOneOrFail(id);
+        } catch (id) {
+          res.status(401).send();
+        }
+    
+        //Verifica se os o array de rols inclui os rols do usuário
+        if (roles.indexOf(user.role) > -1) next();
+        else res.status(401).send();
+      };
+    };
+    ```
+    
+
+More code

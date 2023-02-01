@@ -84,22 +84,45 @@ class UserController {
     // Assinar e Validar os novos valroes do model 
     user.username = username
     user.role = role;
-    cosnt erros = await validate(user);
+    const erros = await validate(user);
     if (erros.lenght > 0) {
       res.status(400).send(erros);
       return;
     }
 
+    // Tentado salves, se falhar, significa que username está em uso 
     try {
       await userRepository.save(user);
+    } catch (e) {
+      res.status(409).send("username already in use");
+      return;
     }
 
+    // Depois, enviaremos um 204 (sem contexto, mas aceitado)
+    res.status(204).send()
+  }
+
+  static delteteUser = async (req: Request, res: Response) => {
+    // Pegar ID da url
+    const id = req.params.id;
+
+    const userRepository = getRepository(User);
+    let user: User;
+    try {
+      user = await userRepository.findOneOrFail(id);
+    } catch (error) {
+      res.status(404).send("Usuário não encontrado")
+      return;
+    }
+
+    res.status(204).send();
 
 
   }
 
-
 }
+
+export default UserController;
 
 
 

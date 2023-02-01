@@ -1,8 +1,6 @@
-#Readme
+# Aprendendo a fazer uma completa aplicação REST API, com autenticação JWT e autorização, usando o poder de TypeScript e TypeORM.
 
-# Aprendendo a fazer uma completa aplicação usando REST API, com autenticação JWT e autorização, usando o poder de TypeScript.
-
-### Vamos começar !
+## Vamos começar !
 
 Vamos começar usando a ferramenta CLI do TypeORM, que nos permite criar uma nova aplicação base para começarmos. Então precisamos instalar TypeORM e configurar nossa aplicação.
 
@@ -25,7 +23,24 @@ npm install -s @types/bcryptjs @types/body-parser @types/cors @types/helmet @typ
 
  A estrutura inicial de nossa aplicação deve ser assim
 
-*estrutura*
+- /src
+    - /config
+        - config.ts
+    - /controller
+        - AuthController.ts
+        - UserController.ts
+    - /entity
+        - User.ts
+    - /middlwares
+        - checkJwt.ts
+        - checkRole.ts
+    - /migration
+        - 1579133758-CreateAdminUser.ts
+    - /routes
+        - auth.ts
+        - index.ts
+        - user.ts
+    - index.ts
 
 ### Index.ts
 

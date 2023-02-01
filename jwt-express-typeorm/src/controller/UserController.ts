@@ -108,12 +108,15 @@ class UserController {
 
     const userRepository = getRepository(User);
     let user: User;
+
     try {
       user = await userRepository.findOneOrFail(id);
     } catch (error) {
       res.status(404).send("Usuário não encontrado")
       return;
     }
+
+
 
     res.status(204).send();
 

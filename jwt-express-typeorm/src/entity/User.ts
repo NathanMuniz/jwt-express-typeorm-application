@@ -31,7 +31,7 @@ export class User {
   }
 
   checkIfUnencryptedPasswordIsValid(unencryptedPassword: string) {
-    bcrypt.compare(unencryptedPassword, this.password)
+    return bcrypt.compare(unencryptedPassword, this.password)
   }
 
 

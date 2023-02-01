@@ -256,4 +256,325 @@ Além dos middlewares que importamos, iremos precisar criar outros que nós ajud
     ```
     
 
-More code
+## Controllers
+
+******************************AuthController****************************** 
+
+Controller responsável por controlar coisas relacionadas ao Login do usuário. Teremos 2 métodos, Login e ChangePassword.
+
+- Login
+    
+    Verificaremos se o os dados necessários para fazer login foi enviar no body. Caso não tenha, iremos enviar um erro de Bad Request - já que está faltando dados.
+    
+    ```tsx
+    class AuthController {
+      static login = async (req: Request, res: Response) => {
+        //Verificar se a senha e username foi enviado
+        let { username, password } = req.body;
+        if (!(username && password)) {
+          res.status(400).send();
+        }
+    }
+    ```
+    
+    ---
+    
+    Então iremos pegar o repositório do User, iremos declarar um novo usuário e tentaremos de forma assíncrona buscar o username enviado no body. Trataremos caso ocorra algum erro, e enviaremos erro 401 indicando Não Autorizado.
+    
+    ```tsx
+    //Pegar usuário do Banco de Dados.
+        const userRepository = getRepository(User);
+        let user: User;
+        try {
+          user = await userRepository.findOneOrFail({ where: { username } });
+        } catch (error) {
+          res.status(401).send();
+        }
+    }
+    ```
+    
+    ---
+    
+    Após ter validado o usuário, então iremos verificar a senha. Caso a senha não esteja correta, iremos enviar um código 401. 
+    
+    Com a senha seja válida, podemos  criar um novo token e enviar ele.
+    
+    ```tsx
+    //Vericar se a senha é válida.
+        if (!user.checkIfUnencryptedPasswordIsValid(password)) {
+          res.status(401).send();
+          return;
+        }
+    
+        //Criar novo jwt token
+        const token = jwt.sign(
+          { userId: user.id, username: user.username },
+          config.jwtSecret,
+          { expiresIn: "1h" }
+        );
+    
+        //Enviamos token no Response
+        res.send(token);
+      };
+    ```
+    
+- changePassword
+    
+    Iremos pegar o Id do usuário que quer trocar a senha de nosso Payload, iremos pegar também a senha atual e a nova senha e verificar se elas foram enviadas com exito no body.
+    
+    Após isso tentaremos buscar um novo usuário com a Id especifica. Caso o usuário for encontrado, usaremos o método o método que verifica se nossa senha está correta, do object User encontrado.
+    
+    ```tsx
+    static changePassword = async (req: Request, res: Response) => {
+        //Pegar is do Token
+        const id = res.locals.jwtPayload.userId;
+    
+        //Pegar parâmetros enviados no Boyd
+        const { oldPassword, newPassword } = req.body;
+        if (!(oldPassword && newPassword)) {
+          res.status(400).send();
+        }
+    
+        //Pegar usuário do Database
+        const userRepository = getRepository(User);
+        let user: User;
+        try {
+          user = await userRepository.findOneOrFail(id);
+        } catch (id) {
+          res.status(401).send();
+        }
+    
+        //Veririca se a senha antiga está correta
+        if (!user.checkIfUnencryptedPasswordIsValid(oldPassword)) {
+          res.status(401).send();
+          return;
+        }
+    }
+    ```
+    
+    ---
+    
+    A senha antiga estando correta, podemos assinar a nova senha no nosso usuário, e verificar se esse usuário continua sendo válido.
+    
+    Então iremos usar o método de hashPassword e salver o usuário.
+    
+    Após tudo ocorrer com sucesso, só nos resta enviar um código adequado 204, que indica que o resquest foi válido e o usuário não precisa sair dessa página.
+    
+    ```tsx
+    //Validate de model (password lenght)
+        user.password = newPassword;
+        const errors = await validate(user);
+        if (errors.length > 0) {
+          res.status(400).send(errors);
+          return;
+        }
+        //Hash the new password and save
+        user.hashPassword();
+        userRepository.save(user);
+    
+        res.status(204).send();
+      };
+    }
+    export default AuthController;
+    ```
+    
+
+****************************UserController****************************
+
+Controller responsável por Buscar, Salver, Editar e Remover usuários. 
+
+- listAll
+    
+    Iremos pegar o repository e tentar usar a função find, no qual iremos selecionar apenas os campos id, username e role para ser enviado.
+    
+    O método find retorna todos os usuário, sendo assim iremos enviar ele em nosso response.
+    
+    ```tsx
+    class UserController {
+    
+      static listAll = async (req: Request, res: Resonse) => {
+        const userRepository = getRepository(User);
+        try {
+          const users = await userRepository.find({
+            select: ["id", "username", "role"] // não precisamo enviar a senha no response
+          });
+        } catch (error) {
+          res.status(404).send("Não foi encontrado usuários no Banco de Dados")
+        }
+    
+        res.send(users);
+    
+      }
+    }
+    ```
+    
+
+---
+
+- getOneById
+    
+    Iremo pegar a ID enviada pela URL
+    
+    Iremo epgar o Repositry e usar o método findOneOrFail, passando o id do usuário. Como no método anterior, não queremos mais campos além do id, username e role.
+    
+    ```tsx
+    static getOneById = async (req: Request, res: Response) => {
+        // Pegar o ID da url 
+        const id: number = req.params.id;
+    
+        //Pegar o Banco de dados do usuário
+        const userRepository = getRepository(User);
+        try {
+          const user = await userRepository.findOneOrFail(id, {
+            select: ["id", "username", "role"]
+          });
+        } catch (error) {
+          res.status(404).send("User not found");
+        }
+    		res.send(user);
+      }
+    }
+    ```
+    
+
+---
+
+- newUser
+    
+    Pegaremos os dados enviados no body, criaremos um novo usuário e assinaremos os campos username, passowrd e role que foi enviado para se criar um novo usuário.
+    
+    Após isso iremos verificase se o usuário criado está correto, usando uma função do ******************************class-validator****************************** que importamos, essa funçaõ validate, verifica se o usuário é um usuário válido, se todoso os campos estão corretos.
+    
+    Também iremos dar chamar o método hashPassword para incriptografar nossa senha.
+    
+    ```tsx
+    static newUser = async (req: Request, res: Reposne) => {
+        // Pegar parametros do body  
+        let { username, password, role } = req.body;
+        let user = new User();
+        user.username = username;
+        user.password = password;
+        user.role = role;
+    
+        //Verifica se os parametros estão ok 
+        const error = await validate(user);
+        if (erros.length > 0) {
+          res.status(400).send(erros);
+          return;
+        }
+    }
+    ```
+    
+    ---
+    
+    Após isso, tentaremos salvar nosso usuário no banco tratando caso ocorra algum erro. Se tudo der certo, enviaremos um status 201, dizendo que o usuário foi criado com sucesso.
+    
+    ```tsx
+    const userRepository = getRepository(User);
+        try {
+          await userRepository.save(user);
+        } catch (e) {
+          res.status(409).send("username already in use");
+          return;
+        }
+    
+        res.status(201).send("User created");
+      };
+    ```
+    
+    ---
+    
+- editUser
+    
+    Pegaremos a ID do usuário que queremos editar e os parametros do body.
+    
+    Tentaremos buscar essa ID, caso o usuário seja encontrado, então iremos assinar o novo username e role do usuário, e usaremos o método validate para validar se continua sendo um usuário válido
+    
+    ```tsx
+    static editUser = async (req: Request, res: Response) => {
+        // Pegar o ID da url 
+        const id = req.params.id
+    
+        const { username, role } = req.body;
+    
+        //Tetando buscar usuário 
+        const userRepository = getRepository(User);
+        let user: User;
+        try {
+          user = await userRepository.findOneOrFail(id);
+        } catch (error) {
+          res.status(404).send("User not found");
+          return;
+        }
+    
+        // Assinar e Validar os novos valroes do model 
+        user.username = username
+        user.role = role;
+        cosnt erros = await validate(user);
+        if (erros.lenght > 0) {
+          res.status(400).send(erros);
+          return;
+        }
+    }
+    ```
+    
+    ---
+    
+    Após isso, iremos tentar salver o usuário. Caso ocorra algum erro, é porque o username já existe.
+    
+    Então enviamos um status code, 204 dizendo que os dados foi aceito, porém não a nada para responder.
+    
+    ```tsx
+    // Tentado salvar, se falhar, significa que username está em uso 
+        try {
+          await userRepository.save(user);
+        } catch (e) {
+          res.status(409).send("username already in use");
+          return;
+        }
+    
+        // Depois, enviaremos um 204 (sem contexto, mas aceitado)
+        res.status(204).send()
+      }
+    ```
+    
+    ---
+    
+- deleteUser
+    
+    Pegaremos a ID do usuário que quremos deletar, que foi enviada pela URL.
+    
+    após isso buscaremos esse usuário da mesma forma como estamos fazendo.
+    
+    Depois, basta user o chamar o método para deleta o usuário e enviar o código apropriada.
+    
+    ```tsx
+    static delteteUser = async (req: Request, res: Response) => {
+        // Pegar ID da url
+        const id = req.params.id;
+    
+        const userRepository = getRepository(User);
+        let user: User;
+        try {
+          user = await userRepository.findOneOrFail(id);
+        } catch (error) {
+          res.status(404).send("Usuário não encontrado")
+          return;
+        }
+    
+        res.status(204).send();
+    
+      }
+    
+    }
+    
+    export default UserController;
+    ```
+    
+    ---
+    
+    ## IMPORTANTE
+    
+    - Essa aplicação não está completa, tentei estudar e fazer ela em pouco dias, o que acabou ocasionando em alguns erros no código.
+    - Não só não está completa, como também não está atualizada, por isso desisti de estudar ela no meio do caminho.
+    - Irei estudar e fazer outras aplicações mais atulizadas usando tecnologias com uma documentação melhor….
